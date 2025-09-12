@@ -2,7 +2,6 @@ import streamlit as st
 from openai import OpenAI
 from llama_cloud_services import LlamaCloudIndex
 
-
 # Initialize the LlamaCloud index
 @st.cache_resource
 def initialize_index():

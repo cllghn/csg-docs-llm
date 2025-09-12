@@ -1,32 +1,17 @@
 import streamlit as st
 from openai import OpenAI
-import toml
 from llama_cloud_services import LlamaCloudIndex
 
-# Load configuration from TOML file
-@st.cache_data
-def load_config():
-    try:
-        config = toml.load("secrets.toml")
-        return config
-    except FileNotFoundError:
-        st.error("secrets.toml file not found. Please create one with your API key.")
-        st.stop()
-    except Exception as e:
-        st.error(f"Error loading config: {e}")
-        st.stop()
 
 # Initialize the LlamaCloud index
 @st.cache_resource
 def initialize_index():
-    config = load_config()
-    
     try:
         index = LlamaCloudIndex(
             name="csg-docs-2",
             project_name="Default",
             organization_id="f76af4a9-a7d3-4e76-8171-9d45e587eac1",
-            api_key=config["LLAMA_CLOUD_API_KEY"],
+            api_key=st.secrets["LLAMA_CLOUD_API_KEY"],
         )
         return index
 
@@ -36,8 +21,7 @@ def initialize_index():
 
 @st.cache_resource
 def get_openai_client():
-    config = load_config()
-    return OpenAI(api_key=config['openai_key'])
+    return OpenAI(api_key=st.secrets['openai_key'])
 
 def retrieve_trusted_content(index: LlamaCloudIndex, query: str, top_k: int = 5, min_similarity: float = 0.1):
     retriever = index.as_retriever(similarity_top_k=top_k)

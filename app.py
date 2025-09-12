@@ -80,9 +80,9 @@ def main():
     
     st.warning('This application is an **experiment**, please use it accordingly and verify any critical information.', icon="⚠️")
 
-    st.markdown("Enter your query to search the CSG Justice Centerdocuments index. " \
-                "The system will retrieve relevant content. That content is then summarized by the LLM. You will then be presented with a response based on that generative process. " \
-                "Keep in mind that index is **very** limited in scope and that the team is continuously working to expand it.")
+    st.markdown("Enter your query to search the CSG Justice Center documents index. " \
+                "The system will retrieve relevant content from the index. That content is then summarized by the LLM. You will then be presented with a response. " \
+                "Keep in mind that index is **very** limited in scope, so the answers might be incomplete, out of date, or worse.")
    
     # Initialize the index and OpenAI client
     index = initialize_index()

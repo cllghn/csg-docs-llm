@@ -75,16 +75,25 @@ def chat_with_retrieval(query: str):
     return response.choices[0].message.content
 
 def main():
-    st.title("🦙LlamaCloud Query App")
-    st.write("Enter your query below to search the CSG docs index:")
+    st.set_page_config(page_title="CSG Justice Center GAMBLER", page_icon="🦙", layout="centered")
+    st.markdown("# CSG Justice Center: *G*uided *A*ggregation of *M*aterials and *B*riefs using *L*arge-Language Models and *E*nhanced *R*ules (GAMBLER)🦙")
+    
+    st.warning('This application is an **experiment**, please use it accordingly and verify any critical information.', icon="⚠️")
+
+    st.markdown("Enter your query to search the CSG Justice documents index. " \
+                "The system will retrieve relevant content. That content is then summarized by the LLM. You will then be presented with a response based on that generative process. " \
+                "Keep in mind that index is **very** limited in scope and that the team is continuously working to expand it.")
    
     # Initialize the index and OpenAI client
     index = initialize_index()
     client = get_openai_client()
-   
+    
+    st.divider()
+
     # Query input
-    query = st.text_input("Enter your query:", placeholder="What would you like to know?")
-    print(query)
+    query = st.text_input("Enter your query below:", 
+                          placeholder="What would you like to know? For example, 'What is Justice Reinvestment?'",
+                          help="Type your question here and click Search.")
    
     if st.button("Search") and query:
         with st.spinner("Searching..."):

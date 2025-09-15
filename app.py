@@ -22,22 +22,24 @@ def initialize_index():
 def get_openai_client():
     return OpenAI(api_key=st.secrets['openai_key'])
 
-def retrieve_trusted_content(index: LlamaCloudIndex, query: str, top_k: int = 5, min_similarity: float = 0.1):
+def retrieve_trusted_content(index: LlamaCloudIndex, query: str, top_k: int = 5, 
+                             min_similarity: float = 0.7):
     retriever = index.as_retriever(similarity_top_k=top_k)
     nodes = retriever.retrieve(query)
     filtered_nodes = [node for node in nodes if node.score >= min_similarity]
-    
+    print(filtered_nodes)
+
     if not filtered_nodes:
         return ["<no_relevant_content>No sufficiently relevant content found.</no_relevant_content>"]
     
-    return [f"<excerpt confidence=\"{node.score:.2f}\">{node.text}</excerpt>" 
+    return [f"<excerpt confidence=\"{node.score:.2f}\" source=\"{node.metadata.get('id', '')}\">{node.text}</excerpt>" 
             for node in filtered_nodes]
 
-def chat_with_retrieval(query: str, conversation_history: list):
+def chat_with_retrieval(query: str, conversation_history: list ):
     # Get trusted content first
     index = initialize_index()
     excerpts = retrieve_trusted_content(index=index, query=query)
-    print(excerpts)
+    # print(excerpts)
     client = get_openai_client()
     
     # Create system message
@@ -50,8 +52,9 @@ def chat_with_retrieval(query: str, conversation_history: list):
     - If the excerpts don't contain enough information to answer the question, say "The provided content does not contain sufficient information to answer this question"
     - Always cite which excerpt(s) you're using by referencing the confidence scores
     - Never make assumptions or fill in gaps with outside knowledge
-    - If confidence scores are low (<0.7), mention this uncertainty in your response
-    - Always tell me the name of the report that you pulled the excerpts from and if information is coming from multiple reports note it.
+    - If confidence scores are lower (0.7 to 0.8), mention this uncertainty in your response
+    - If the confidence scores are high (0.8+), you can be more definitive in your response
+    - Always tell me the name of the report that you pulled the excerpts from and if information is coming from multiple reports note it. Include those source as the bottom of the response. 
     """
     # Build conversation with retrieved content
     messages = [{"role": "system", "content": system_message}]

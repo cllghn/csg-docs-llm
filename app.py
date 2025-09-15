@@ -23,7 +23,7 @@ def get_openai_client():
     return OpenAI(api_key=st.secrets['openai_key'])
 
 def retrieve_trusted_content(index: LlamaCloudIndex, query: str, top_k: int = 5, 
-                             min_similarity: float = 0.7):
+                             min_similarity: float = 0.6):
     retriever = index.as_retriever(similarity_top_k=top_k)
     nodes = retriever.retrieve(query)
     filtered_nodes = [node for node in nodes if node.score >= min_similarity]

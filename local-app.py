@@ -1,29 +1,43 @@
 import streamlit as st
 from openai import OpenAI
-from llama_cloud_services import LlamaCloudIndex
-import re
+from llama_index.core import StorageContext, load_index_from_storage, Settings
+from llama_index.embeddings.openai import OpenAIEmbedding
+import os
+import dotenv
 
-# Initialize the LlamaCloud index
+dotenv.load_dotenv()
+Settings.embed_model = OpenAIEmbedding(
+    model="text-embedding-ada-002",
+    api_key=os.getenv("CHATGPT_API_KEY")
+)
+
 @st.cache_resource
 def initialize_index():
     try:
-        index = LlamaCloudIndex(
-            name="csg-docs-2",
-            project_name="Default",
-            organization_id="f76af4a9-a7d3-4e76-8171-9d45e587eac1",
-            api_key=st.secrets["LLAMA_CLOUD_API_KEY"]
-        )
+        # Path to your local storage directory
+        storage_dir = "./storage"  # Adjust this path as needed
+        
+        if not os.path.exists(storage_dir):
+            st.error(f"Storage directory '{storage_dir}' not found. Please ensure your index is built and stored in this location.")
+            st.stop()
+        
+        # Load the storage context
+        storage_context = StorageContext.from_defaults(persist_dir=storage_dir)
+        
+        # Load the index from storage
+        index = load_index_from_storage(storage_context)
+        
         return index
 
     except Exception as e:
-        st.error(f"Error initializing LlamaCloud index: {e}")
+        st.error(f"Error loading local index: {e}")
         st.stop()
 
 @st.cache_resource
 def get_openai_client():
     return OpenAI(api_key=st.secrets['openai_key'])
 
-def retrieve_trusted_content(index: LlamaCloudIndex, query: str, top_k: int = 5, 
+def retrieve_trusted_content(index, query: str, top_k: int = 5, 
                              min_similarity: float = 0.6):
     retriever = index.as_retriever(similarity_top_k=top_k)
     nodes = retriever.retrieve(query)
@@ -32,11 +46,11 @@ def retrieve_trusted_content(index: LlamaCloudIndex, query: str, top_k: int = 5,
 
     if not filtered_nodes:
         return ["<no_relevant_content>No sufficiently relevant content found.</no_relevant_content>"]
-    print(filtered_nodes)
-    return [f"<excerpt confidence=\"{node.score:.2f}\" source=\"{node.metadata.get('id', '')}\" page=\"{node.metadata.get('page_label', '')}\">{node.text}</excerpt>"  
+    
+    return [f"<excerpt confidence=\"{node.score:.2f}\" source=\"{node.metadata.get('file_name', node.metadata.get('id', ''))}\">{node.text}</excerpt>" 
             for node in filtered_nodes]
 
-def chat_with_retrieval(query: str, conversation_history: list ):
+def chat_with_retrieval(query: str, conversation_history: list):
     # Get trusted content first
     index = initialize_index()
     excerpts = retrieve_trusted_content(index=index, query=query)
@@ -55,8 +69,7 @@ def chat_with_retrieval(query: str, conversation_history: list ):
     - Never make assumptions or fill in gaps with outside knowledge
     - If confidence scores are lower (0.7 to 0.8), mention this uncertainty in your response
     - If the confidence scores are high (0.8+), you can be more definitive in your response
-    - Always tell me the name of the report that you pulled the excerpts from and if information is coming from multiple reports note it. Include those sources at the bottom of the response.
-    - Tell me what pages the information is coming from in the response.
+    - Always tell me the name of the document/file that you pulled the excerpts from and if information is coming from multiple documents note it. Include those sources at the bottom of the response. 
     """
     # Build conversation with retrieved content
     messages = [{"role": "system", "content": system_message}]
@@ -76,29 +89,29 @@ def chat_with_retrieval(query: str, conversation_history: list ):
 
     # Make the API call
     response = client.chat.completions.create(
-        model="gpt-5",
+        model="gpt-4o",  # Changed from gpt-5 to gpt-4o (more commonly available)
         messages=messages,
-        temperature=1,  # Defaul is 1 for gpt-5
+        temperature=0.7,  # Slightly lower temperature for more consistent responses
         stream=True
     )
     
     return response
 
 def main():
-    st.set_page_config(page_title="CSG Justice Center GAMBLER", page_icon="🦙", layout="centered")
-    st.markdown("# CSG Justice Center: *G*uided *A*ggregation of *M*aterials and *B*riefs using *L*arge-Language Models and *E*nhanced *R*ules (GAMBLER)🦙")
+    st.set_page_config(page_title="Local Document Search", page_icon="🔍", layout="centered")
+    st.markdown("# CSG Justice Center: Local *G*uided *A*ggregation of *M*aterials and *B*riefs using *L*arge-Language Models and *E*nhanced *R*ules (Local GAMBLER)🦙")
     
     st.warning('This application is an **experiment**, please use it accordingly and verify any critical information.', icon="⚠️")
 
-    st.markdown("Enter your query to search the CSG Justice Center documents index. " \
-                "The system will retrieve relevant content from the index. That content is then summarized by the LLM. You will then be presented with a response. " \
-                "Keep in mind that index is **very** limited in scope, so the answers might be incomplete, out of date, or worse.")
+    st.markdown("Enter your query to search your local document index. " \
+                "The system will retrieve relevant content from your local storage. That content is then summarized by the LLM. " \
+                "Keep in mind that the index scope depends on the documents you've indexed.")
    
     # Initialize the index and OpenAI client
     index = initialize_index()
     client = get_openai_client()
     
-    # Check if 'messages' exists in session state; otherwise; initialize it
+    # Check if 'messages' exists in session state; otherwise initialize it
     if "messages" in st.session_state:
         messages = st.session_state.messages
     else:
@@ -108,7 +121,8 @@ def main():
     for message in messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
-    if prompt := st.chat_input("Ask me about CSG Justice Center documents..."):
+            
+    if prompt := st.chat_input("Ask me about your documents..."):
         # Add user message to chat history
         messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
@@ -117,7 +131,7 @@ def main():
         # Generate and stream assistant response
         with st.chat_message("assistant"):
             try:
-                # Show a spinner and progress bar while retrieving and streaming the response
+                # Show a spinner while retrieving and streaming the response
                 with st.spinner("Retrieving trusted content and generating response..."):
                     response_stream = chat_with_retrieval(prompt, messages[:-1])  # Exclude current message
 
@@ -125,13 +139,11 @@ def main():
                     response_placeholder = st.empty()
                     full_response = ""
 
-
                     for chunk in response_stream:
                         # Append streamed content when present
                         if chunk.choices[0].delta.content is not None:
                             full_response += chunk.choices[0].delta.content
                             response_placeholder.markdown(full_response + "▌")
-
 
                     response_placeholder.markdown(full_response)
 

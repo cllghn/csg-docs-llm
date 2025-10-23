@@ -29,7 +29,7 @@ def get_openai_client():
     return OpenAI(api_key=st.secrets['openai_key'])
 
 def retrieve_trusted_content(index: LlamaCloudIndex, query: str, top_k: int, 
-                             min_similarity: float = 0.6):
+                             min_similarity: float):
     retriever = index.as_retriever(similarity_top_k=top_k)
     nodes = retriever.retrieve(query)
     filtered_nodes = [node for node in nodes if node.score >= min_similarity]
@@ -42,11 +42,12 @@ def retrieve_trusted_content(index: LlamaCloudIndex, query: str, top_k: int,
             for node in filtered_nodes]
 
 def chat_with_retrieval(query: str, conversation_history: list, index_name: str, 
-                        retrieve_n: int):
+                        retrieve_n: int, min_similarity: float):
     # Get trusted content first
     index = initialize_index(index_name=index_name)
     excerpts = retrieve_trusted_content(index=index, query=query, 
-                                        top_k=retrieve_n)
+                                        top_k=retrieve_n,
+                                        min_similarity=min_similarity)
     # print(excerpts)
     client = get_openai_client()
     
@@ -160,15 +161,15 @@ def main():
     )
 
     # Set up a slider to change the minimum similarity threshold ---------------
-    if "min_similarity" not in st.session_state:
-        st.session_state.min_similarity = 0.65
+    if "MIN_SIMILARITY" not in st.session_state:
+        st.session_state.MIN_SIMILARITY = 0.65
 
-    min_similarity = st.sidebar.slider(
+    MIN_SIMILARITY = st.sidebar.slider(
         "Minimum Similarity Threshold:",
         min_value=0.5,
         max_value=1.0,
-        value=st.session_state.min_similarity,
-        step=0.1,
+        value=st.session_state.MIN_SIMILARITY,
+        step=0.01,
         help="Minimum similarity threshold for retrieved excerpts, between 0.5 and 1.0. Lower values will yield less relevant results."
     )
 
@@ -181,7 +182,7 @@ def main():
 
 
     # Contact info -------------------------------------------------------------
-    st.markdown(
+    st.sidebar.markdown(
         """
         <div style="
             position: fixed;
@@ -209,10 +210,6 @@ def main():
     st.markdown("# CSG Justice Center: *G*uided *A*ggregation of *M*aterials and *B*riefs using *L*arge-Language Models and *E*nhanced *R*ules (GAMBLER)🦙")
     
     st.warning('This application is an **experiment**, please use it accordingly and verify any critical information.', icon="⚠️")
-
-    # # Initialize the index and OpenAI client
-    # index = initialize_index()
-    
     
     st.markdown("Enter your query to search the CSG Justice Center documents index. " \
                 "The system will retrieve relevant content from the index. That content is then summarized by the LLM. You will then be presented with a response. " \
@@ -238,6 +235,10 @@ def main():
                       disabled=True)
 
     elif prompt := st.chat_input("Ask me about CSG Justice Center documents in the selected index..."):
+        # TODO: Write prompt manipulation logic here to handle the "we" issue 
+        # and others.
+        # prompt = prompt.replace("we", "CSG Justice Center")
+
         # Add user message to chat history
         messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
@@ -250,7 +251,9 @@ def main():
                 with st.spinner("Retrieving trusted content and generating response..."):
                     response_stream = chat_with_retrieval(prompt, messages[:-1], 
                                                           index_name=selected_index, 
-                                                          retrieve_n=top_n) 
+                                                          retrieve_n=top_n,
+                                                          min_similarity=MIN_SIMILARITY
+                                                          ) 
 
                     # Stream the response
                     response_placeholder = st.empty()

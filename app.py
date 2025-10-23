@@ -108,8 +108,19 @@ def main():
         """
         <style>
             section[data-testid="stSidebar"] {
-                min-width: 350px !important; # Set the width to your desired value
+                min-width: 350px !important;
             }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    # Hide the collapse button of the sidebar
+    st.markdown(
+        """
+        <style>
+        [data-testid="stSidebarCollapseButton"] {
+            display: none
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -127,7 +138,7 @@ def main():
         options=list(AVAILABLE_INDEXES.keys()),
         format_func=lambda x: AVAILABLE_INDEXES[x],
         index=list(AVAILABLE_INDEXES.keys()).index(st.session_state.selected_index),
-        help="Choose which document index to search"
+        help="Choose which document index to search. Different indexes may contain different sets of documents curated for different purposes."
     )
     
     # If index changed, clear conversation history
@@ -145,7 +156,20 @@ def main():
         min_value=3,
         max_value=15,
         value=st.session_state.top_n,
-        help="Number of top relevant excerpts to retrieve from the index"
+        help="Number of top relevant excerpts to retrieve from the index. More documents may provide better context but can also introduce noise."
+    )
+
+    # Set up a slider to change the minimum similarity threshold ---------------
+    if "min_similarity" not in st.session_state:
+        st.session_state.min_similarity = 0.65
+
+    min_similarity = st.sidebar.slider(
+        "Minimum Similarity Threshold:",
+        min_value=0.5,
+        max_value=1.0,
+        value=st.session_state.min_similarity,
+        step=0.1,
+        help="Minimum similarity threshold for retrieved excerpts, between 0.5 and 1.0. Lower values will yield less relevant results."
     )
 
     # Check if selected index is coming soon
@@ -156,6 +180,30 @@ def main():
         st.sidebar.info(f"You would be currently retrieving **up to {top_n} excerpts** for summary **from the {AVAILABLE_INDEXES[selected_index]} index**.", icon="ℹ️")
 
 
+    # Contact info -------------------------------------------------------------
+    st.markdown(
+        """
+        <div style="
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.95);
+            padding: 8px 16px;
+            font-size: 14px;
+            text-align: center;
+            border-top: 1px solid #eee;
+            z-index: 9999;
+        ">
+            Developed with ❤️ and <a href="https://github.com/cllghn/csg-docs-llm" target="_blank">version control</a> by <a href="mailto:ccallaghan@csg.org">Chris Callaghan</a>. 
+            Report bugs or request features on <a href="https://github.com/cllghn/csg-docs-llm/issues" target="_blank">GitHub</a>.
+        </div>
+
+        <!-- spacer to prevent the fixed footer from overlapping page content -->
+        <div style="height:48px;"></div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     # Main app =================================================================
     st.markdown("# CSG Justice Center: *G*uided *A*ggregation of *M*aterials and *B*riefs using *L*arge-Language Models and *E*nhanced *R*ules (GAMBLER)🦙")
